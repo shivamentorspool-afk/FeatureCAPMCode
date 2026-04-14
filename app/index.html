@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title> Feature Analytic Dashboard | SAP Datasphere</title>
+
+    <!-- SAP UI5 Bootstrap -->
+    <script
+        id="sap-ui-bootstrap"
+        src="https://ui5.sap.com/1.120.0/resources/sap-ui-core.js"
+        data-sap-ui-theme="sap_horizon"
+        data-sap-ui-libs="sap.m,sap.ui.table,sap.ui.core,sap.f,sap.ui.layout"
+        data-sap-ui-compatVersion="edge"
+        data-sap-ui-async="true">
+    </script>
+
+    <style>
+        body { margin: 0; padding: 0; background: #f5f6f7; }
+
+        .headerBar {
+            background: #0070f2;
+            color: #fff;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .headerBar h1 { margin: 0; font-size: 18px; font-weight: 600; }
+        .headerBar .meta { font-size: 12px; opacity: 0.85; }
+
+        .statusStrip {
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 6px 20px;
+            display: flex;
+            gap: 24px;
+            font-size: 12px;
+            color: #555;
+            align-items: center;
+        }
+        .statusStrip .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        .badge-success  { background: #d4edda; color: #155724; }
+        .badge-warning  { background: #fff3cd; color: #856404; }
+        .badge-error    { background: #f8d7da; color: #721c24; }
+        .badge-pending  { background: #e2e3e5; color: #383d41; }
+
+        .filterBar {
+            background: #fff;
+            padding: 10px 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .summaryRow {
+            display: flex;
+            gap: 12px;
+            padding: 12px 20px;
+            flex-wrap: wrap;
+        }
+        .summaryCard {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 20px;
+            min-width: 140px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .summaryCard .value { font-size: 28px; font-weight: 700; color: #0070f2; }
+        .summaryCard .label { font-size: 11px; color: #666; margin-top: 2px; }
+
+        .tableWrap { padding: 0 20px 20px; }
+
+        #countdown { font-weight: 600; color: #fff; }
+
+        .paginationBar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+        .paginationBar button {
+            padding: 4px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+        }
+        .paginationBar button:disabled { opacity: 0.4; cursor: default; }
+        .paginationBar button:hover:not(:disabled) { background: #f0f4ff; }
+
+        /* ── Status Update Modal ─────────────────── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: #fff;
+            border-radius: 10px;
+            padding: 28px 32px;
+            min-width: 380px;
+            max-width: 480px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+        }
+        .modal-box h2 { margin: 0 0 6px; font-size: 17px; color: #1a1a2e; }
+        .modal-box .modal-sub { font-size: 12px; color: #888; margin-bottom: 20px; }
+        .modal-box label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #333; }
+        .modal-box select, .modal-box input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 13px;
+            margin-bottom: 14px;
+            box-sizing: border-box;
+        }
+        .modal-box select:focus, .modal-box input:focus {
+            outline: none;
+            border-color: #0070f2;
+            box-shadow: 0 0 0 2px rgba(0,112,242,0.15);
+        }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+        .btn-primary {
+            background: #0070f2; color: #fff; border: none;
+            padding: 8px 20px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: 600;
+        }
+        .btn-primary:hover { background: #005ecb; }
+        .btn-primary:disabled { background: #aac8f7; cursor: not-allowed; }
+        .btn-secondary {
+            background: #fff; color: #333; border: 1px solid #ccc;
+            padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;
+        }
+        .btn-secondary:hover { background: #f5f5f5; }
+
+        /* ── Toast notification ──────────────────── */
+        .toast {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            z-index: 2000;
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none;
+            max-width: 360px;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast-success { background: #27ae60; }
+        .toast-error   { background: #c0392b; }
+        .toast-info    { background: #2980b9; }
+
+        /* ── Update button in table ──────────────── */
+        .btn-update-status {
+            background: #fff;
+            color: #0070f2;
+            border: 1px solid #0070f2;
+            padding: 3px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .btn-update-status:hover { background: #e8f0fe; }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────── -->
+<div class="headerBar">
+    <h1>🔷 Feature Analytic Dashboard &nbsp;|&nbsp; SAP Datasphere</h1>
+    <div class="meta">
+        Auto-refresh every 5 minutes &nbsp;|&nbsp;
+        Next refresh in: <span id="countdown">5:00</span>
+    </div>
+</div>
+
+<!-- ── Status Strip ───────────────────────── -->
+<div class="statusStrip">
+    <span>Total Records: <strong id="recordCount">—</strong></span>
+    <span>Pages Fetched: <strong id="pageCount">—</strong></span>
+    <span>Last Refresh: <strong id="lastRefresh">—</strong></span>
+    <span>Sync Status: <span id="syncBadge" class="badge badge-pending">PENDING</span></span>
+    <span style="margin-left:auto;">
+        <button id="btnRefresh"
+            style="background:#0070f2;color:#fff;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;">
+            ↻ Refresh Now
+        </button>
+        <button id="btnExport"
+            style="background:#fff;color:#0070f2;border:1px solid #0070f2;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;margin-left:6px;">
+            ⬇ Export CSV
+        </button>
+    </span>
+</div>
+
+<!-- ── Summary Cards ──────────────────────── -->
+<div class="summaryRow" id="summaryRow">
+    <div class="summaryCard"><div class="value" id="cTotal">0</div><div class="label">Total Features</div></div>
+    <div class="summaryCard"><div class="value" id="cCreated" style="color:#f39c12;">0</div><div class="label">In Specification</div></div>
+    <div class="summaryCard"><div class="value" id="cInReal" style="color:#e67e22;">0</div><div class="label">In Implementation</div></div>
+    <div class="summaryCard"><div class="value" id="cInTest" style="color:#3498db;">0</div><div class="label">In Testing</div></div>
+    <div class="summaryCard"><div class="value" id="cConfirmed" style="color:#27ae60;">0</div><div class="label">Deployed</div></div>
+    <div class="summaryCard"><div class="value" id="cApproved" style="color:#8e44ad;">0</div><div class="label">Approved</div></div>
+    <div class="summaryCard"><div class="value" id="cTested" style="color:#16a085;">0</div><div class="label">Successfully Tested</div></div>
+</div>
+
+<!-- ── Filter Bar ─────────────────────────── -->
+<div class="filterBar">
+    <input id="searchInput" type="text" placeholder="🔍 Search feature, project, responsible..."
+        style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;width:280px;font-size:13px;" />
+
+    <select id="statusFilter"
+        style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        <option value="">All Statuses</option>
+        <option value="CREATED">In Specification</option>
+        <option value="IN_REALIZATION">In Implementation</option>
+        <option value="IN_TESTING">In Testing</option>
+        <option value="CONFIRMED">Deployed</option>
+        <option value="SUCCESSFULLY_TESTED">Successfully Tested</option>
+        <option value="APPROVED_FOR_DEPLOYMENT">Approved for Deployment</option>
+        <option value="NOT_PLANNED">Not Planned</option>
+    </select>
+
+    <select id="priorityFilter"
+        style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+        <option value="">All Priorities</option>
+        <option value="Very High">Very High</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
+    </select>
+
+    <button onclick="clearFilters()"
+        style="padding:6px 12px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;font-size:13px;">
+        ✕ Clear
+    </button>
+
+    <span style="margin-left:auto;font-size:12px;color:#888;">
+        Showing: <strong id="showingCount">0</strong> of <strong id="totalCount">0</strong> records
+    </span>
+</div>
+
+<!-- ── Data Table ─────────────────────────── -->
+<div class="tableWrap">
+    <table id="dataTable"
+        style="width:100%;border-collapse:collapse;background:#fff;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+        <thead>
+            <tr style="background:#f0f4ff;border-bottom:2px solid #d0d8f0;">
+                <th style="padding:10px 8px;text-align:left;white-space:nowrap;">Feature ID</th>
+                <th style="padding:10px 8px;text-align:left;">Feature Name</th>
+                <th style="padding:10px 8px;text-align:left;">Project</th>
+                <th style="padding:10px 8px;text-align:left;">Status</th>
+                <th style="padding:10px 8px;text-align:left;">Priority</th>
+                <th style="padding:10px 8px;text-align:left;">Workstream</th>
+                <th style="padding:10px 8px;text-align:left;">Release</th>
+                <th style="padding:10px 8px;text-align:left;">Responsible</th>
+                <th style="padding:10px 8px;text-align:left;">Scope</th>
+                <th style="padding:10px 8px;text-align:left;">Date</th>
+                <th style="padding:10px 8px;text-align:center;">Counter</th>
+                <th style="padding:10px 8px;text-align:center;">Action</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            <tr><td colspan="12" style="text-align:center;padding:40px;color:#999;">
+                Loading data from SAP Datasphere...
+            </td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ── Pagination Bar ─────────────────────── -->
+<div class="paginationBar">
+    <button id="btnFirst"  onclick="goToPage(1)">« First</button>
+    <button id="btnPrev"   onclick="goToPage(currentPage - 1)">‹ Prev</button>
+    <span id="pageInfo" style="min-width:120px;text-align:center;">Page 1 of 1</span>
+    <button id="btnNext"   onclick="goToPage(currentPage + 1)">Next ›</button>
+    <button id="btnLast"   onclick="goToPage(totalPages)">Last »</button>
+    <span style="margin-left:12px;font-size:12px;color:#888;">
+        Rows per page:
+        <select id="pageSizeSelect" onchange="changePageSize()" style="font-size:12px;padding:2px 4px;">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+        </select>
+    </span>
+</div>
+
+<!-- ── Status Update Modal ────────────────── -->
+<div class="modal-overlay" id="statusModal">
+    <div class="modal-box">
+        <h2>✏️ Update Feature Status</h2>
+        <p class="modal-sub" id="modalSubtitle">Feature ID: —</p>
+
+        <label>Feature ID</label>
+        <input type="text" id="modalFeatureId" readonly
+            style="background:#f5f5f5;color:#666;cursor:not-allowed;" />
+
+        <label>Current Status</label>
+        <input type="text" id="modalCurrentStatus" readonly
+            style="background:#f5f5f5;color:#666;cursor:not-allowed;" />
+
+        <label>New Status <span style="color:#c0392b;">*</span></label>
+        <select id="modalNewStatus">
+            <option value="">— Select new status —</option>
+            <option value="CREATED">In Specification (CREATED)</option>
+            <option value="IN_REALIZATION">In Implementation (IN_REALIZATION)</option>
+            <option value="IN_TESTING">In Testing (IN_TESTING)</option>
+            <option value="CONFIRMED">Deployed (CONFIRMED)</option>
+            <option value="SUCCESSFULLY_TESTED">Successfully Tested (SUCCESSFULLY_TESTED)</option>
+            <option value="APPROVED_FOR_DEPLOYMENT">Approved for Deployment (APPROVED_FOR_DEPLOYMENT)</option>
+            <option value="NOT_PLANNED">Not Planned (NOT_PLANNED)</option>
+        </select>
+
+        <label>Updated By</label>
+        <input type="text" id="modalUpdatedBy" placeholder="Your name or email (optional)" />
+
+        <div id="modalError"
+            style="display:none;background:#fdf0f0;border:1px solid #f5c6cb;border-radius:4px;
+                   padding:8px 12px;font-size:12px;color:#721c24;margin-bottom:12px;">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn-primary" id="btnConfirmUpdate" onclick="confirmStatusUpdate()">
+                Update Status
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Toast ──────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// Configuration
+// ─────────────────────────────────────────────
+const SERVICE_URL        = '/odata/v4/FeatureAnalyticService/Feature_Analytic_Model';
+const STATUS_URL         = '/odata/v4/FeatureAnalyticService/getSyncStatus()';
+const UPDATE_ACTION_URL  = '/odata/v4/FeatureAnalyticService/updateFeatureStatus';
+const REFRESH_INTERVAL   = 300; // seconds
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let allData      = [];
+let filteredData = [];
+let currentPage  = 1;
+let pageSize     = 100;
+let totalPages   = 1;
+let countdown    = REFRESH_INTERVAL;
+let countdownTimer;
+
+// Modal state
+let modalFeatureId    = null;
+let modalCurrentStatus = null;
+
+// ─────────────────────────────────────────────
+// Status badge helper
+// ─────────────────────────────────────────────
+const STATUS_STYLE = {
+    'CREATED':                  'background:#e8f4fd;color:#0070f2;',
+    'IN_REALIZATION':           'background:#fff3cd;color:#856404;',
+    'IN_TESTING':               'background:#d1ecf1;color:#0c5460;',
+    'CONFIRMED':                'background:#d4edda;color:#155724;',
+    'SUCCESSFULLY_TESTED':      'background:#c3e6cb;color:#155724;',
+    'APPROVED_FOR_DEPLOYMENT':  'background:#cce5ff;color:#004085;',
+    'NOT_PLANNED':              'background:#f8d7da;color:#721c24;'
+};
+
+const PRIORITY_STYLE = {
+    'Very High': 'color:#c0392b;font-weight:700;',
+    'High':      'color:#e74c3c;font-weight:600;',
+    'Medium':    'color:#f39c12;',
+    'Low':       'color:#27ae60;'
+};
+
+// ─────────────────────────────────────────────
+// Toast notification
+// ─────────────────────────────────────────────
+function showToast(message, type = 'success', duration = 4000) {
+    const toast = document.getElementById('toast');
+    toast.textContent  = message;
+    toast.className    = `toast toast-${type} show`;
+    setTimeout(() => { toast.className = `toast toast-${type}`; }, duration);
+}
+
+// ─────────────────────────────────────────────
+// Status Update Modal
+// ─────────────────────────────────────────────
+function openUpdateModal(featureId, currentStatus, featureName) {
+    modalFeatureId     = featureId;
+    modalCurrentStatus = currentStatus;
+
+    document.getElementById('modalSubtitle').textContent      = `Feature: ${featureName || featureId}`;
+    document.getElementById('modalFeatureId').value           = featureId;
+    document.getElementById('modalCurrentStatus').value       = currentStatus;
+    document.getElementById('modalNewStatus').value           = '';
+    document.getElementById('modalUpdatedBy').value           = '';
+    document.getElementById('modalError').style.display       = 'none';
+    document.getElementById('btnConfirmUpdate').disabled      = false;
+    document.getElementById('btnConfirmUpdate').textContent   = 'Update Status';
+
+    document.getElementById('statusModal').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('statusModal').classList.remove('active');
+    modalFeatureId     = null;
+    modalCurrentStatus = null;
+}
+
+// Close modal on overlay click
+document.getElementById('statusModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+
+// ─────────────────────────────────────────────
+// Confirm Status Update — POST to CAPM action
+// ─────────────────────────────────────────────
+async function confirmStatusUpdate() {
+    const newStatus  = document.getElementById('modalNewStatus').value;
+    const updatedBy  = document.getElementById('modalUpdatedBy').value.trim();
+    const errorDiv   = document.getElementById('modalError');
+    const confirmBtn = document.getElementById('btnConfirmUpdate');
+
+    // Client-side validation
+    if (!newStatus) {
+        errorDiv.textContent    = 'Please select a new status.';
+        errorDiv.style.display  = 'block';
+        return;
+    }
+
+    if (newStatus === modalCurrentStatus) {
+        errorDiv.textContent    = `Status is already "${newStatus}". Please select a different status.`;
+        errorDiv.style.display  = 'block';
+        return;
+    }
+
+    errorDiv.style.display    = 'none';
+    confirmBtn.disabled       = true;
+    confirmBtn.textContent    = '⏳ Updating...';
+
+    try {
+        // POST to CAPM OData action
+        const response = await fetch(UPDATE_ACTION_URL, {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept':       'application/json'
+            },
+            body: JSON.stringify({
+                featureId:  modalFeatureId,
+                newStatus:  newStatus,
+                updatedBy:  updatedBy || 'UI User'
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            // OData error format
+            const errMsg = result?.error?.message
+                        || result?.message
+                        || `HTTP ${response.status}: Update failed`;
+            throw new Error(errMsg);
+        }
+
+        // ── Success ───────────────────────────────────────────────
+        closeModal();
+
+        // Optimistically update local data
+        const idx = allData.findIndex(r => r.featureId === modalFeatureId);
+        if (idx !== -1) {
+            allData[idx].status     = newStatus;
+            allData[idx].statusText = result.value?.newStatus
+                ? STATUS_TEXT_MAP[newStatus] || newStatus
+                : newStatus;
+        }
+
+        updateSummaryCards(allData);
+        applyFilters();
+
+        showToast(
+            `✅ Feature "${modalFeatureId}" status updated to "${newStatus}" successfully.`,
+            'success'
+        );
+
+        // Trigger a background data refresh to sync with server
+        setTimeout(() => loadData(false), 2000);
+
+    } catch (err) {
+        console.error('Update error:', err);
+        errorDiv.textContent   = `❌ ${err.message}`;
+        errorDiv.style.display = 'block';
+        confirmBtn.disabled    = false;
+        confirmBtn.textContent = 'Update Status';
+    }
+}
+
+// Status text map for optimistic UI update
+const STATUS_TEXT_MAP = {
+    CREATED:                 'In Specification',
+    IN_REALIZATION:          'In Implementation',
+    IN_TESTING:              'In Testing',
+    CONFIRMED:               'Deployed',
+    SUCCESSFULLY_TESTED:     'Successfully Tested',
+    APPROVED_FOR_DEPLOYMENT: 'Approved for Deployment',
+    NOT_PLANNED:             'Not Planned'
+};
+
+// ─────────────────────────────────────────────
+// Fetch ALL data from CAPM OData service
+// ─────────────────────────────────────────────
+async function loadData(showLoader) {
+    if (showLoader) {
+        document.getElementById('tableBody').innerHTML =
+            '<tr><td colspan="12" style="text-align:center;padding:40px;color:#999;">⏳ Loading all records from SAP Datasphere...</td></tr>';
+    }
+
+    try {
+        const url  = `${SERVICE_URL}?$top=10000&$orderby=featureId asc`;
+        const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+
+        const json = await resp.json();
+        allData = json.value || [];
+
+        try {
+            const statusResp = await fetch(STATUS_URL, { headers: { 'Accept': 'application/json' } });
+            if (statusResp.ok) {
+                const statusJson = await statusResp.json();
+                document.getElementById('pageCount').textContent = statusJson.pagesFetched ?? '—';
+            }
+        } catch (_) { /* non-fatal */ }
+
+        updateSummaryCards(allData);
+        applyFilters();
+        updateStatusStrip('SUCCESS');
+        resetCountdown();
+
+    } catch (err) {
+        console.error('Load error:', err);
+        updateStatusStrip('FAILED');
+        document.getElementById('tableBody').innerHTML =
+            `<tr><td colspan="12" style="text-align:center;padding:40px;color:#c0392b;">
+                ❌ Failed to load data: ${err.message}
+            </td></tr>`;
+    }
+}
+
+// ─────────────────────────────────────────────
+// Summary cards
+// ─────────────────────────────────────────────
+function updateSummaryCards(data) {
+    document.getElementById('cTotal').textContent     = data.length;
+    document.getElementById('cCreated').textContent   = data.filter(r => r.status === 'CREATED').length;
+    document.getElementById('cInReal').textContent    = data.filter(r => r.status === 'IN_REALIZATION').length;
+    document.getElementById('cInTest').textContent    = data.filter(r => r.status === 'IN_TESTING').length;
+    document.getElementById('cConfirmed').textContent = data.filter(r => r.status === 'CONFIRMED').length;
+    document.getElementById('cApproved').textContent  = data.filter(r => r.status === 'APPROVED_FOR_DEPLOYMENT').length;
+    document.getElementById('cTested').textContent    = data.filter(r => r.status === 'SUCCESSFULLY_TESTED').length;
+}
+
+// ─────────────────────────────────────────────
+// Filter logic
+// ─────────────────────────────────────────────
+function applyFilters() {
+    const search   = document.getElementById('searchInput').value.toLowerCase();
+    const status   = document.getElementById('statusFilter').value;
+    const priority = document.getElementById('priorityFilter').value;
+
+    filteredData = allData.filter(r => {
+        const matchSearch = !search ||
+            (r.featureName  || '').toLowerCase().includes(search) ||
+            (r.featureId    || '').toLowerCase().includes(search) ||
+            (r.projectName  || '').toLowerCase().includes(search) ||
+            (r.responsible  || '').toLowerCase().includes(search) ||
+            (r.workstream   || '').toLowerCase().includes(search);
+
+        const matchStatus   = !status   || r.status   === status;
+        const matchPriority = !priority || r.priority === priority;
+
+        return matchSearch && matchStatus && matchPriority;
+    });
+
+    document.getElementById('totalCount').textContent   = filteredData.length;
+    document.getElementById('showingCount').textContent = filteredData.length;
+
+    currentPage = 1;
+    totalPages  = Math.max(1, Math.ceil(filteredData.length / pageSize));
+    renderCurrentPage();
+}
+
+function clearFilters() {
+    document.getElementById('searchInput').value    = '';
+    document.getElementById('statusFilter').value   = '';
+    document.getElementById('priorityFilter').value = '';
+    applyFilters();
+}
+
+// ─────────────────────────────────────────────
+// Pagination
+// ─────────────────────────────────────────────
+function goToPage(page) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderCurrentPage();
+}
+
+function changePageSize() {
+    pageSize    = parseInt(document.getElementById('pageSizeSelect').value);
+    currentPage = 1;
+    totalPages  = Math.max(1, Math.ceil(filteredData.length / pageSize));
+    renderCurrentPage();
+}
+
+function renderCurrentPage() {
+    const start    = (currentPage - 1) * pageSize;
+    const end      = Math.min(start + pageSize, filteredData.length);
+    const pageData = filteredData.slice(start, end);
+
+    renderTable(pageData);
+
+    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+    document.getElementById('btnFirst').disabled = currentPage === 1;
+    document.getElementById('btnPrev').disabled  = currentPage === 1;
+    document.getElementById('btnNext').disabled  = currentPage === totalPages;
+    document.getElementById('btnLast').disabled  = currentPage === totalPages;
+
+    document.getElementById('showingCount').textContent =
+        filteredData.length > 0 ? `${start + 1}–${end}` : '0';
+}
+
+// ─────────────────────────────────────────────
+// Table rendering — includes Update Status button
+// ─────────────────────────────────────────────
+function renderTable(data) {
+    const tbody = document.getElementById('tableBody');
+
+    if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#999;">No records found.</td></tr>';
+        return;
+    }
+
+    const rows = data.map((r, i) => {
+        const rowBg   = i % 2 === 0 ? '#fff' : '#f9fbff';
+        const stStyle = STATUS_STYLE[r.status]     || '';
+        const prStyle = PRIORITY_STYLE[r.priority] || '';
+
+        // Escape for use in onclick attribute
+        const safeId   = (r.featureId   || '').replace(/'/g, "\\'");
+        const safeSt   = (r.status      || '').replace(/'/g, "\\'");
+        const safeName = (r.featureName || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+        return `<tr style="background:${rowBg};border-bottom:1px solid #eee;">
+            <td style="padding:8px;white-space:nowrap;font-weight:600;color:#0070f2;">${esc(r.featureId)}</td>
+            <td style="padding:8px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.featureName)}">${esc(r.featureName)}</td>
+            <td style="padding:8px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.projectName)}">${esc(r.projectName)}</td>
+            <td style="padding:8px;">
+                <span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;${stStyle}">${esc(r.statusText)}</span>
+            </td>
+            <td style="padding:8px;${prStyle}">${esc(r.priority)}</td>
+            <td style="padding:8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.workstream)}</td>
+            <td style="padding:8px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.release || '—')}</td>
+            <td style="padding:8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.responsible || '—')}</td>
+            <td style="padding:8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.scopeName || '')}">${esc(r.scopeName || '—')}</td>
+            <td style="padding:8px;white-space:nowrap;">${esc(r.date)}</td>
+            <td style="padding:8px;text-align:center;">${r.counter ?? 0}</td>
+            <td style="padding:8px;text-align:center;">
+                <button class="btn-update-status"
+                    onclick="openUpdateModal('${safeId}','${safeSt}','${safeName}')">
+                    ✏️ Update
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = rows.join('');
+}
+
+function esc(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// ─────────────────────────────────────────────
+// Status strip update
+// ─────────────────────────────────────────────
+function updateStatusStrip(status) {
+    document.getElementById('recordCount').textContent = allData.length;
+    document.getElementById('lastRefresh').textContent = new Date().toLocaleString();
+
+    const badge = document.getElementById('syncBadge');
+    badge.textContent = status;
+    badge.className   = 'badge ' + (
+        status === 'SUCCESS' ? 'badge-success' :
+        status === 'FAILED'  ? 'badge-error'   :
+        status === 'RUNNING' ? 'badge-warning'  : 'badge-pending'
+    );
+}
+
+// ─────────────────────────────────────────────
+// Countdown timer
+// ─────────────────────────────────────────────
+function resetCountdown() {
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdown = REFRESH_INTERVAL;
+
+    countdownTimer = setInterval(() => {
+        countdown--;
+        const m = Math.floor(countdown / 60);
+        const s = countdown % 60;
+        document.getElementById('countdown').textContent =
+            `${m}:${String(s).padStart(2, '0')}`;
+
+        if (countdown <= 0) {
+            clearInterval(countdownTimer);
+            loadData(false);
+        }
+    }, 1000);
+}
+
+// ─────────────────────────────────────────────
+// CSV Export
+// ─────────────────────────────────────────────
+function exportCSV() {
+    if (!filteredData.length) { alert('No data to export.'); return; }
+
+    const cols = ['featureId','featureName','projectName','status','statusText',
+                  'priority','workstream','release','responsible','scopeName',
+                  'requirementName','date','week','counter'];
+
+    const lines = [cols.join(',')];
+    filteredData.forEach(r => {
+        lines.push(cols.map(c => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(','));
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `FeatureAnalytic_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
+// Event Listeners
+// ─────────────────────────────────────────────
+document.getElementById('btnRefresh').addEventListener('click', () => loadData(true));
+document.getElementById('btnExport').addEventListener('click', exportCSV);
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('statusFilter').addEventListener('change', applyFilters);
+document.getElementById('priorityFilter').addEventListener('change', applyFilters);
+
+// ─────────────────────────────────────────────
+// Bootstrap
+// ─────────────────────────────────────────────
+loadData(true);
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+_schema-version: '3.1'
+ID: datasphere-feature-analytic-dev
+extends: datasphere-feature-analytic
+
+resources:
+  - name: datasphere-credentials
+    parameters:
+      credentials:
+        client-id: "sb-f499052c-a57a-4b39-b606-d0b328e5e3c9!b620034|client!b3650"
+        client-secret: "cd684ee4-b4a5-49c0-b639-32d52b4764ef$eVPmixpPCC9RCsV8fPnauOg_SG4eyZGoM_Mks2lyaiE="
+        token-url: "https://mentorspooldsp.authentication.eu10.hana.ondemand.com/oauth/token"
+        base-url: "https://mentorspooldsp.eu10.hcs.cloud.sap"
+        calm-base-url: "https://mentorspooldsp.eu10.alm.cloud.sap"
